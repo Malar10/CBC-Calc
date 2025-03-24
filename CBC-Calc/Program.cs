@@ -6,13 +6,36 @@ namespace CBC_Calc
 	{
 		static void Main(string[] args)
 		{
+
+			Vector3 cannonpos = new Vector3(0, 0, 0);
+			Vector3 targetpos = new Vector3(110, 0, 110);
+
+			Vector3 localpos = targetpos - cannonpos;
+
+			float yaw = MathF.Atan2(localpos.X, localpos.Z);
+			float yawDeg = yaw * 180 / MathF.PI;
+
+			float dist = MathF.Sqrt(MathF.Pow(localpos.X, 2) + MathF.Pow(localpos.Z, 2));
+
+			var p = new ProjectileEnv();
+			var closeOnes = p.calc(dist, localpos.Y);
+
+			Console.WriteLine("\nClose ones:");
+			foreach (Hit hit in closeOnes)
+			{
+				Console.WriteLine(hit);
+			}
+		}
+
+		void teststuff()
+		{
 			Console.WriteLine("Hello, World!");
-			
+
 			float yaw = 90f;
-			float pitch = -37f;
-			float vel = 200f / 20f;
+			float pitch = -74.3f;
+			float vel = 240f / 20f;
 			bool ismortarstone = false;
-			Vector3 cannonPos = new Vector3(0,0,0);
+			Vector3 cannonPos = new Vector3(0, 0, 0);
 			float cannonLength = 0f;
 
 			//bear hole from shooting range
@@ -24,21 +47,21 @@ namespace CBC_Calc
 			//float cannonLength = 3f;
 
 			Vector3 direction = new Vector3(0, 0, 1);
-			Quaternion rotQuat = Quaternion.CreateFromYawPitchRoll(-yaw * MathF.PI/180, pitch * MathF.PI / 180, 0);
+			Quaternion rotQuat = Quaternion.CreateFromYawPitchRoll(-yaw * MathF.PI / 180, pitch * MathF.PI / 180, 0);
 			direction = Vector3.Normalize(Vector3.Transform(direction, rotQuat));
-            Console.WriteLine($"direction: {direction}");
+			Console.WriteLine($"direction: {direction}");
 
 			Vector3 shootpos = cannonPos + (direction * cannonLength);
 			Console.WriteLine($"shootpos {shootpos}");
 
-			
+
 			Projectile shell = new Projectile(shootpos, direction * vel, ismortarstone);
 
 			int i = 0;
 			while (true)
 			{
 				i++;
-                Console.WriteLine($"\ntick {i}");
+				Console.WriteLine($"\ntick {i}");
 				shell.Tick();
 
 				if (shell.position.Y <= cannonPos.Y)
@@ -66,7 +89,6 @@ namespace CBC_Calc
 					Console.WriteLine($"{n}: {a}      {sum2}");
 				}
 			}
-			
 		}
 
 		
@@ -225,6 +247,90 @@ namespace CBC_Calc
 		{
 
 			return new Vector3(MathF.Pow(v.X, exp), MathF.Pow(v.Y, exp), MathF.Pow(v.Z, exp));
+		}
+	}
+
+	
+
+	class ProjectileEnv
+	{
+		float D = 0.99f; //1 - drag
+		float G = -0.05f; //gravity
+		float v; //start vel
+
+		public ProjectileEnv()
+		{
+			v = 160f / 20f; //start vel
+		}
+
+		public List<Hit> calc(float desired_x, float desired_y)
+		{
+
+			float t = 0;
+			List<Hit> closeOnes = new();
+
+			while (true)
+			{
+				t = t + 1;
+				Console.Write($"\n{t}: ");
+				if (t > 1000) break;
+
+				float thingy = anglethingy(t, desired_y);
+				if (thingy < -1 || thingy > 1) continue; //height not reachable at this angle
+
+				float angle = MathF.Asin(thingy);
+				Console.Write($"angle: {angle}, ");
+
+				float x = getXAtTAndAngle(t, angle);
+				Console.Write($"x: {x}");
+
+
+				if (MathF.Abs(x - desired_x) < 10f) //close
+				{
+					closeOnes.Add(new Hit(x, desired_y, t, angle));
+				}
+			}
+
+			return closeOnes;
+		}
+
+		float anglethingy(float t, float y)
+		{
+			float upper = -G * MathF.Pow(D, t) + MathF.Log(D) * ((D - 1) * y + G * t) + G;
+			float lower = (D - 1) * v * (MathF.Pow(D, t) - 1);
+
+			return upper / lower;
+		}
+
+		float getXAtTAndAngle(float t, float a)
+		{
+			// D != 1
+			float x = v * MathF.Cos(a) * (MathF.Pow(D, t) - 1) / MathF.Log(D);
+			return x;
+		}
+
+		
+	}
+
+	class Hit
+	{
+		float t;
+		float angle;
+		float x;
+		float y;
+
+		public Hit(float _x, float _y, float _t, float _angle)
+		{
+			x = _x;
+			y = _y;
+			t = _t;
+			angle = _angle;
+		}
+
+		public override string ToString()
+		{
+			float degrees = angle * 180 / MathF.PI;
+			return $"Hit ({x}, {y}) at t={t} at pitch={degrees} degrees";
 		}
 	}
 }

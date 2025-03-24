@@ -396,3 +396,8 @@ FodyWeavers.xsd
 
 # JetBrains Rider
 *.sln.iml
+
+#geogebra l'math n other math stuff
+*.ggb
+*.lma
+*.html
