@@ -6,24 +6,88 @@ namespace CBC_Calc
 	{
 		static void Main(string[] args)
 		{
+			while (true)
+			{
+				CalculateAngles();
 
-			Vector3 cannonpos = new Vector3(0, 0, 0);
-			Vector3 targetpos = new Vector3(110, 0, 110);
+                Console.WriteLine("Calculate another shot?");
+                Console.WriteLine("y/n");
+				string? response = Console.ReadLine();
+				if (response.Equals("y", StringComparison.OrdinalIgnoreCase))
+				{
+                    Console.WriteLine();
+				} else 
+				{
+					break;
+				}
+			}
+		}
+
+		static void CalculateAngles()
+		{
+			Vector3 cannonpos = getInputPosition("give cannon coordinates:");
+			Vector3 targetpos = getInputPosition("\ngive target coordinates:");
 
 			Vector3 localpos = targetpos - cannonpos;
-
-			float yaw = MathF.Atan2(localpos.X, localpos.Z);
+			float yaw = -MathF.Atan2(localpos.X, localpos.Z);
 			float yawDeg = yaw * 180 / MathF.PI;
-
 			float dist = MathF.Sqrt(MathF.Pow(localpos.X, 2) + MathF.Pow(localpos.Z, 2));
 
-			var p = new ProjectileEnv();
-			var closeOnes = p.calc(dist, localpos.Y);
+			Console.WriteLine();
+			Console.WriteLine($"Distance: {dist} blocks");
+			Console.WriteLine($"Yaw: {yawDeg} degrees ({360+yawDeg} degrees)");
+            Console.WriteLine();
+			Console.WriteLine("Close pitch angles:");
 
-			Console.WriteLine("\nClose ones:");
-			foreach (Hit hit in closeOnes)
+			var p = new ProjectileEnv();
+
+			for (int charges = 1; charges <= 8; charges++)
 			{
-				Console.WriteLine(hit);
+				p.charges = charges;
+
+                Console.WriteLine($"Charges: {charges}");
+				var closeOnes = p.calc(dist, localpos.Y);
+
+				foreach (Hit hit in closeOnes)
+				{
+					Console.WriteLine(hit);
+				}
+                Console.WriteLine();
+			}
+		}
+
+		static Vector3 getInputPosition(string text)
+		{
+			while (true)
+			{
+                Console.WriteLine(text);
+                Console.WriteLine("X Y Z");
+				string? input = Console.ReadLine();
+				if (input == null) 
+				{
+                    Console.WriteLine("input something buddy");
+					continue;
+				}
+
+				var n = input.Split(' ', options: StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+				if (n.Length != 3)
+				{
+                    Console.WriteLine("should have 3 coordinates");
+					continue;
+				}
+
+				try
+				{
+					Vector3 pos = new Vector3(float.Parse(n[0]), float.Parse(n[1]), float.Parse(n[2]));
+
+					return pos;
+				}
+				catch (Exception)
+				{
+                    Console.WriteLine("not a number");
+					continue;
+				}
+				
 			}
 		}
 
@@ -258,9 +322,14 @@ namespace CBC_Calc
 		float G = -0.05f; //gravity
 		float v; //start vel
 
+		float maxError = 5f;
+
+		public int charges { set => v = value * 40f/20f; }
+
 		public ProjectileEnv()
 		{
-			v = 160f / 20f; //start vel
+			charges = 1;
+			//v = 160f / 20f; //start vel
 		}
 
 		public List<Hit> calc(float desired_x, float desired_y)
@@ -271,23 +340,25 @@ namespace CBC_Calc
 
 			while (true)
 			{
+				//this is silly
+
 				t = t + 1;
-				Console.Write($"\n{t}: ");
+				//Console.Write($"\n{t}: ");
 				if (t > 1000) break;
 
 				float thingy = anglethingy(t, desired_y);
 				if (thingy < -1 || thingy > 1) continue; //height not reachable at this angle
 
 				float angle = MathF.Asin(thingy);
-				Console.Write($"angle: {angle}, ");
+				//Console.Write($"angle: {angle}, ");
 
 				float x = getXAtTAndAngle(t, angle);
-				Console.Write($"x: {x}");
+				//Console.Write($"x: {x}");
 
 
-				if (MathF.Abs(x - desired_x) < 10f) //close
+				if (MathF.Abs(x - desired_x) < maxError) //close
 				{
-					closeOnes.Add(new Hit(x, desired_y, t, angle));
+					closeOnes.Add(new Hit(x, x - desired_x, desired_y, t, angle));
 				}
 			}
 
@@ -308,8 +379,6 @@ namespace CBC_Calc
 			float x = v * MathF.Cos(a) * (MathF.Pow(D, t) - 1) / MathF.Log(D);
 			return x;
 		}
-
-		
 	}
 
 	class Hit
@@ -317,11 +386,13 @@ namespace CBC_Calc
 		float t;
 		float angle;
 		float x;
+		float xError;
 		float y;
 
-		public Hit(float _x, float _y, float _t, float _angle)
+		public Hit(float _x, float _xError, float _y, float _t, float _angle)
 		{
 			x = _x;
+			xError = _xError;
 			y = _y;
 			t = _t;
 			angle = _angle;
@@ -330,7 +401,12 @@ namespace CBC_Calc
 		public override string ToString()
 		{
 			float degrees = angle * 180 / MathF.PI;
-			return $"Hit ({x}, {y}) at t={t} at pitch={degrees} degrees";
+
+			string distString = $"error={xError.ToString("n1").PadLeft(4)}m".PadRight(15);
+			string pitchString = $"pitch={degrees.ToString("n2").PadLeft(5)}°".PadRight(15);
+			string timeString = $"t={t.ToString().PadLeft(5)} ticks";
+
+			return $"Hit: {pitchString} {distString} {timeString}";
 		}
 	}
 }
